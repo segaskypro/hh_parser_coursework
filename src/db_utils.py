@@ -1,7 +1,10 @@
+from typing import List, Dict, Any
 import psycopg2
-from config import Config
+from src.config import Config
 
-def create_database():
+
+def create_database() -> None:
+    """Создаёт базу данных, если она не существует."""
     conn = psycopg2.connect(
         host=Config.DB_HOST,
         port=Config.DB_PORT,
@@ -11,21 +14,23 @@ def create_database():
     )
     conn.autocommit = True
     cur = conn.cursor()
-    
+
     cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (Config.DB_NAME,))
     if not cur.fetchone():
         cur.execute(f"CREATE DATABASE {Config.DB_NAME}")
         print(f"База данных {Config.DB_NAME} создана")
     else:
         print(f"База данных {Config.DB_NAME} уже существует")
-    
+
     cur.close()
     conn.close()
 
-def create_tables():
+
+def create_tables() -> None:
+    """Создаёт таблицы companies и vacancies, если они не существуют."""
     conn = psycopg2.connect(Config.get_db_url())
     cur = conn.cursor()
-    
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS companies (
             id INTEGER PRIMARY KEY,
@@ -34,7 +39,7 @@ def create_tables():
             url VARCHAR(255)
         )
     """)
-    
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS vacancies (
             id INTEGER PRIMARY KEY,
@@ -47,16 +52,22 @@ def create_tables():
             requirement TEXT
         )
     """)
-    
+
     conn.commit()
     cur.close()
     conn.close()
     print("Таблицы созданы")
 
-def save_companies_to_db(companies):
+
+def save_companies_to_db(companies: List[Dict[str, Any]]) -> None:
+    """Сохраняет список компаний в базу данных.
+
+    Args:
+        companies: Список словарей с данными компаний
+    """
     conn = psycopg2.connect(Config.get_db_url())
     cur = conn.cursor()
-    
+
     for company in companies:
         cur.execute("""
             INSERT INTO companies (id, name, description, url)
@@ -68,16 +79,22 @@ def save_companies_to_db(companies):
             company.get('description', ''),
             company.get('site_url', '')
         ))
-    
+
     conn.commit()
     cur.close()
     conn.close()
     print(f"Сохранено компаний: {len(companies)}")
 
-def save_vacancies_to_db(vacancies):
+
+def save_vacancies_to_db(vacancies: List[Dict[str, Any]]) -> None:
+    """Сохраняет список вакансий в базу данных.
+
+    Args:
+        vacancies: Список словарей с данными вакансий
+    """
     conn = psycopg2.connect(Config.get_db_url())
     cur = conn.cursor()
-    
+
     count = 0
     for vac in vacancies:
         salary = vac.get('salary')
@@ -85,10 +102,10 @@ def save_vacancies_to_db(vacancies):
         salary_to = salary.get('to') if salary else None
         currency = salary.get('currency') if salary else None
         requirement = vac.get('snippet', {}).get('requirement', '')
-        
+
         if requirement and len(requirement) > 500:
             requirement = requirement[:500]
-        
+
         try:
             cur.execute("""
                 INSERT INTO vacancies (id, company_id, name, salary_from, salary_to, currency, url, requirement)
@@ -105,9 +122,9 @@ def save_vacancies_to_db(vacancies):
                 requirement
             ))
             count += 1
-        except:
+        except Exception:
             pass
-    
+
     conn.commit()
     cur.close()
     conn.close()
